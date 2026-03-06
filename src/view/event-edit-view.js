@@ -1,7 +1,91 @@
 import { createElement } from '../utils/render.js';
+import { EventType, EventTypeLabels, EventTypeIcons } from '../const.js';
+import { formatDate } from '../utils/common.js';
 
-const createEventEditTemplate = () => (
-  `<li class="trip-events__item">
+const createTypeItemTemplate = (type, currentType) => {
+  const isChecked = type === currentType ? 'checked' : '';
+  return `
+    <div class="event__type-item">
+      <input id="event-type-${type}-1" class="event__type-input  visually-hidden" type="radio" name="event-type" value="${type}" ${isChecked}>
+      <label class="event__type-label  event__type-label--${type}" for="event-type-${type}-1">${EventTypeLabels[type]}</label>
+    </div>
+  `;
+};
+
+const createDestinationOptionTemplate = (destination) =>
+  `<option value="${destination.name}"></option>`;
+
+const createOfferTemplate = (offer, isChecked) => {
+  const checked = isChecked ? 'checked' : '';
+  return `
+    <div class="event__offer-selector">
+      <input class="event__offer-checkbox  visually-hidden" id="event-offer-${offer.id}-1" type="checkbox" name="event-offer-${offer.id}" ${checked}>
+      <label class="event__offer-label" for="event-offer-${offer.id}-1">
+        <span class="event__offer-title">${offer.title}</span>
+        &plus;&euro;&nbsp;
+        <span class="event__offer-price">${offer.price}</span>
+      </label>
+    </div>
+  `;
+};
+
+const createPhotoTemplate = (picture) =>
+  `<img class="event__photo" src="${picture.src}" alt="${picture.description}">`;
+
+const createEventEditTemplate = (event, destinations, offers, isNew = false) => {
+  const { type, destination, dateFrom, dateTo, basePrice } = event;
+
+  const destinationObj = destinations.find((dest) => dest.id === destination);
+  const destinationName = destinationObj ? destinationObj.name : '';
+
+  const availableOffers = offers.filter((offer) => offer.type === type);
+  const selectedOfferIds = event.offers || [];
+
+  const typeItems = Object.values(EventType)
+    .map((typeItem) => createTypeItemTemplate(typeItem, type))
+    .join('');
+
+  const destinationOptions = destinations
+    .map((dest) => createDestinationOptionTemplate(dest))
+    .join('');
+
+  const offerItems = availableOffers
+    .map((offer) => createOfferTemplate(offer, selectedOfferIds.includes(offer.id)))
+    .join('');
+
+  const resetButtonText = isNew ? 'Cancel' : 'Delete';
+
+  const offersSection = availableOffers.length > 0 ? `
+    <section class="event__section  event__section--offers">
+      <h3 class="event__section-title  event__section-title--offers">Offers</h3>
+      <div class="event__available-offers">
+        ${offerItems}
+      </div>
+    </section>
+  ` : '';
+
+  const destinationSection = destinationObj ? `
+    <section class="event__section  event__section--destination">
+      <h3 class="event__section-title  event__section-title--destination">Destination</h3>
+      <p class="event__destination-description">${destinationObj.description || ''}</p>
+      ${destinationObj.pictures && destinationObj.pictures.length > 0 ? `
+        <div class="event__photos-container">
+          <div class="event__photos-tape">
+            ${destinationObj.pictures.map((picture) => createPhotoTemplate(picture)).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </section>
+  ` : '';
+
+  const detailsSection = (offersSection || destinationSection) ? `
+    <section class="event__details">
+      ${offersSection}
+      ${destinationSection}
+    </section>
+  ` : '';
+
+  return `<li class="trip-events__item">
     <form class="event event--edit" action="#" method="post">
       <header class="event__header">
         <div class="event__type-wrapper">
@@ -87,13 +171,26 @@ const createEventEditTemplate = () => (
         </section>
       </section>
     </form>
-  </li>`
-);
+  </li>`;
+      };
 
 export default class EventEditView {
+  constructor(event, destinations, offers, isNew = false) {
+    this.event = event;
+    this.destinations = destinations;
+    this.offers = offers;
+    this.isNew = isNew;
+    this.element = null;
+  }
+
   getElement() {
     if (!this.element) {
-      this.element = createElement(createEventEditTemplate());
+      this.element = createElement(createEventEditTemplate(
+        this.event,
+        this.destinations,
+        this.offers,
+        this.isNew
+      ));
     }
     return this.element;
   }
