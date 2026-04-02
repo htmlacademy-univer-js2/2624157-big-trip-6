@@ -1,11 +1,9 @@
-import { createElement } from '../utils/render.js';
+import AbstractView from '../framework/view/abstract-view.js';
 import { EventTypeIcons, EventTypeLabels } from '../const.js';
 import { formatEventDate, formatTime, formatDuration } from '../utils/common.js';
 
 const createOfferTemplate = (offer) => {
-  if (!offer){
-    return '';
-  }
+  if (!offer) return '';
 
   return `
     <li class="event__offer">
@@ -18,7 +16,6 @@ const createOfferTemplate = (offer) => {
 
 const createEventTemplate = (event, destination, offers) => {
   const { type, dateFrom, dateTo, basePrice, isFavorite } = event;
-
   const destinationName = destination ? destination.name : '';
   const selectedOffers = offers
     .filter((offer) => event.offers.includes(offer.id))
@@ -26,7 +23,6 @@ const createEventTemplate = (event, destination, offers) => {
     .join('');
 
   const favoriteClass = isFavorite ? 'event__favorite-btn--active' : '';
-
 
   return `<li class="trip-events__item">
     <div class="event">
@@ -65,23 +61,40 @@ const createEventTemplate = (event, destination, offers) => {
   </li>`;
 };
 
-export default class EventView {
+export default class EventView extends AbstractView {
   constructor(event, destinations, offers) {
+    super();
     this.event = event;
     this.destinations = destinations;
     this.offers = offers;
-    this.element = null;
   }
 
-  getElement() {
-    if (!this.element) {
-      const destination = this.destinations.find((dest) => dest.id === this.event.destination);
-      this.element = createElement(createEventTemplate(this.event, destination, this.offers));
-    }
-    return this.element;
+  get template() {
+    const destination = this.destinations.find((dest) => dest.id === this.event.destination);
+    return createEventTemplate(this.event, destination, this.offers);
   }
 
-  removeElement() {
-    this.element = null;
+  get rollupButton() {
+    return this.element.querySelector('.event__rollup-btn');
   }
+
+  setEditClickHandler(callback) {
+    this._callback.editClick = callback;
+    this.rollupButton.addEventListener('click', this.#editClickHandler);
+  }
+
+  setFavoriteClickHandler(callback) {
+    this._callback.favoriteClick = callback;
+    this.element.querySelector('.event__favorite-btn').addEventListener('click', this.#favoriteClickHandler);
+  }
+
+  #editClickHandler = (evt) => {
+    evt.preventDefault();
+    this._callback.editClick();
+  };
+
+  #favoriteClickHandler = (evt) => {
+    evt.preventDefault();
+    this._callback.favoriteClick();
+  };
 }

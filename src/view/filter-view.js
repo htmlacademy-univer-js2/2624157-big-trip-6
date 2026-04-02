@@ -1,4 +1,5 @@
-import { createElement } from '../utils/render.js';
+//import { createElement } from '../utils/render.js';
+import AbstractView from '../framework/view/abstract-view';
 
 const createFilterTemplate = () => (
   `<form class="trip-filters" action="#" method="get">
@@ -26,15 +27,15 @@ const createFilterTemplate = () => (
   </form>`
 );
 
-export default class FilterView {
-  getElement() {
-    if (!this.element) {
-      this.element = createElement(createFilterTemplate());
-    }
-    return this.element;
+export default class FilterView extends AbstractView  {
+  get template() {
+    return createFilterTemplate();
   }
 
-  removeElement() {
-    this.element = null;
+  setFilterChangeHandler(callback) {
+    this._callback.filterChange = callback;
+    this.element.querySelectorAll('.trip-filters__filter-input').forEach((input) => {
+      input.addEventListener('change', () => callback(input.value));
+    });
   }
 }
