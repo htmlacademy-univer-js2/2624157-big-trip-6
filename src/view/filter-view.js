@@ -1,41 +1,55 @@
-//import { createElement } from '../utils/render.js';
-import AbstractView from '../framework/view/abstract-view';
+import AbstractView from '../framework/view/abstract-view.js';
 
-const createFilterTemplate = () => (
-  `<form class="trip-filters" action="#" method="get">
-    <div class="trip-filters__filter">
-      <input id="filter-everything" class="trip-filters__filter-input  visually-hidden" type="radio" name="trip-filter" value="everything" checked>
-      <label class="trip-filters__filter-label" for="filter-everything">Everything</label>
-    </div>
+const createFilterTemplate = (filters, currentFilter) => {
+  const filterItems = filters.map((filter) => {
+    const isChecked = filter.type === currentFilter ? 'checked' : '';
+    const isDisabled = filter.count === 0 ? 'disabled' : '';
 
-    <div class="trip-filters__filter">
-      <input id="filter-future" class="trip-filters__filter-input  visually-hidden" type="radio" name="trip-filter" value="future">
-      <label class="trip-filters__filter-label" for="filter-future">Future</label>
-    </div>
+    return `
+      <div class="trip-filters__filter">
+        <input id="filter-${filter.type}"
+               class="trip-filters__filter-input visually-hidden"
+               type="radio"
+               name="trip-filter"
+               value="${filter.type}"
+               ${isChecked}
+               ${isDisabled}>
+        <label class="trip-filters__filter-label" for="filter-${filter.type}">
+          ${filter.name} ${filter.count !== null ? `<span class="trip-filters__filter-count">${filter.count}</span>` : ''}
+        </label>
+      </div>
+    `;
+  }).join('');
 
-    <div class="trip-filters__filter">
-      <input id="filter-present" class="trip-filters__filter-input  visually-hidden" type="radio" name="trip-filter" value="present">
-      <label class="trip-filters__filter-label" for="filter-present">Present</label>
-    </div>
+  return `
+    <form class="trip-filters" action="#" method="get">
+      ${filterItems}
+      <button class="visually-hidden" type="submit">Accept filter</button>
+    </form>
+  `;
+};
 
-    <div class="trip-filters__filter">
-      <input id="filter-past" class="trip-filters__filter-input  visually-hidden" type="radio" name="trip-filter" value="past">
-      <label class="trip-filters__filter-label" for="filter-past">Past</label>
-    </div>
+export default class FilterView extends AbstractView {
+  #filters = null;
+  #currentFilter = null;
 
-    <button class="visually-hidden" type="submit">Accept filter</button>
-  </form>`
-);
+  constructor(filters, currentFilter) {
+    super();
+    this.#filters = filters;
+    this.#currentFilter = currentFilter;
+    this._callback = {};
+  }
 
-export default class FilterView extends AbstractView  {
   get template() {
-    return createFilterTemplate();
+    return createFilterTemplate(this.#filters, this.#currentFilter);
   }
 
   setFilterChangeHandler(callback) {
     this._callback.filterChange = callback;
     this.element.querySelectorAll('.trip-filters__filter-input').forEach((input) => {
-      input.addEventListener('change', () => callback(input.value));
+      if (!input.disabled) {
+        input.addEventListener('change', () => callback(input.value));
+      }
     });
   }
 }

@@ -125,6 +125,7 @@ export default class EventEditView extends AbstractStatefulView {
     this.destinations = destinations;
     this.offers = offers;
     this.isNew = isNew;
+    this._callback = {};
 
     this._state = this.#parseState(event);
   }

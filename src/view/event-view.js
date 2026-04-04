@@ -67,6 +67,7 @@ export default class EventView extends AbstractView {
     this.event = event;
     this.destinations = destinations;
     this.offers = offers;
+    this._callback = {};
   }
 
   get template() {

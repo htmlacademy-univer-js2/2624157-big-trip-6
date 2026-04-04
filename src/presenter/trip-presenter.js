@@ -2,6 +2,7 @@ import FilterView from '../view/filter-view.js';
 import SortView from '../view/sort-view.js';
 import EventView from '../view/event-view.js';
 import EventEditView from '../view/event-edit-view.js';
+import EmptyEventsView from '../view/empty-events-view.js';
 import { EventType } from '../const.js';
 import { render, replace, remove } from '../framework/render.js';
 
@@ -16,14 +17,23 @@ const createNewEvent = (destinations) => ({
   isFavorite: false
 });
 
+const SortType = {
+  DAY: 'day',
+  TIME: 'time',
+  PRICE: 'price'
+};
+
 export default class TripPresenter {
   #container = null;
   #eventsModel = null;
   #filterView = null;
   #sortView = null;
+  #emptyView = null;
   #eventComponents = new Map();
   #currentEditComponent = null;
   #currentEventId = null;
+  #currentFilter = 'everything';
+  #currentSort = SortType.DAY;
 
   constructor(container, eventsModel) {
     if (!container) {
@@ -35,11 +45,12 @@ export default class TripPresenter {
     }
     this.#container = container;
     this.#eventsModel = eventsModel;
+
+    this.#eventsModel.addObserver(this.#handleModelUpdate.bind(this));
   }
 
   init() {
     this.#renderFilter();
-    this.#renderSort();
     this.#renderEvents();
   }
 
@@ -50,29 +61,107 @@ export default class TripPresenter {
     this.#renderNewEvent(newEvent, destinations, offers);
   }
 
+  #handleModelUpdate(updateType, data) {
+    this.#renderEvents();
+  }
+
   #renderFilter() {
     const filtersContainer = document.querySelector('.trip-controls__filters');
-    if (filtersContainer) {
-      this.#filterView = new FilterView();
-      render(this.#filterView, filtersContainer);
-      this.#filterView.setFilterChangeHandler(this.#handleFilterChange.bind(this));
-    }
+    if (!filtersContainer) return;
+
+    const filters = this.#eventsModel.getFiltersCount();
+    this.#filterView = new FilterView(filters, this.#currentFilter);
+    render(this.#filterView, filtersContainer);
+    this.#filterView.setFilterChangeHandler(this.#handleFilterChange.bind(this));
   }
 
   #renderSort() {
-    this.#sortView = new SortView();
+    if (this.#sortView) {
+      remove(this.#sortView);
+    }
+
+    this.#sortView = new SortView(this.#currentSort);
     render(this.#sortView, this.#container);
     this.#sortView.setSortChangeHandler(this.#handleSortChange.bind(this));
   }
 
+  #renderEmpty() {
+    if (this.#emptyView) {
+      remove(this.#emptyView);
+    }
+
+    this.#emptyView = new EmptyEventsView();
+    render(this.#emptyView, this.#container);
+  }
+
   #renderEvents() {
-    const events = this.#eventsModel.getEvents();
+    this.#clearEventsList();
+
+    let events = this.#eventsModel.getFilteredEvents(this.#currentFilter);
+
+    events = this.#sortEvents(events);
+
     const destinations = this.#eventsModel.getDestinations();
     const offers = this.#eventsModel.getOffers();
+
+    if (events.length === 0) {
+      this.#renderEmpty();
+      if (this.#sortView) {
+        remove(this.#sortView);
+        this.#sortView = null;
+      }
+      return;
+    }
+
+    if (!this.#sortView) {
+      this.#renderSort();
+    }
 
     events.forEach((event) => {
       this.#renderEvent(event, destinations, offers);
     });
+  }
+
+  #sortEvents(events) {
+    const sortedEvents = [...events];
+
+    switch (this.#currentSort) {
+      case SortType.TIME:
+        sortedEvents.sort((a, b) => {
+          const durationA = new Date(a.dateTo) - new Date(a.dateFrom);
+          const durationB = new Date(b.dateTo) - new Date(b.dateFrom);
+          return durationB - durationA;
+        });
+        break;
+      case SortType.PRICE:
+        sortedEvents.sort((a, b) => b.basePrice - a.basePrice);
+        break;
+      default:
+        sortedEvents.sort((a, b) => new Date(a.dateFrom) - new Date(b.dateFrom));
+        break;
+    }
+
+    return sortedEvents;
+  }
+
+  #clearEventsList() {
+    this.#eventComponents.forEach((components) => {
+      remove(components.event);
+      if (components.edit) {
+        remove(components.edit);
+      }
+    });
+    this.#eventComponents.clear();
+
+    if (this.#emptyView) {
+      remove(this.#emptyView);
+      this.#emptyView = null;
+    }
+
+    if (this.#currentEditComponent) {
+      document.removeEventListener('keydown', this.#escKeyDownHandler);
+      this.#currentEditComponent = null;
+    }
   }
 
   #renderEvent(event, destinations, offers) {
@@ -88,7 +177,16 @@ export default class TripPresenter {
     });
 
     editComponent.setFormSubmitHandler((state) => {
-      console.log('Form submitted', state);
+      const updatedEvent = {
+        ...event,
+        type: state.type,
+        destination: state.destinationId,
+        dateFrom: state.dateFrom,
+        dateTo: state.dateTo,
+        basePrice: state.basePrice,
+        offers: state.selectedOffers
+      };
+      this.#eventsModel.updateEvent(updatedEvent);
       this.#replaceEditToEvent(editComponent, eventComponent);
     });
 
@@ -97,8 +195,7 @@ export default class TripPresenter {
     });
 
     editComponent.setDeleteClickHandler(() => {
-      console.log('Delete clicked for event', event.id);
-      this.#replaceEditToEvent(editComponent, eventComponent);
+      this.#eventsModel.deleteEvent(event.id);
     });
 
     editComponent.setTypeChangeHandler((type) => {
@@ -132,7 +229,16 @@ export default class TripPresenter {
     const newEventComponent = new EventEditView(event, destinations, offers, true);
 
     newEventComponent.setFormSubmitHandler((state) => {
-      console.log('New event saved', state);
+      const newEventData = {
+        ...event,
+        type: state.type,
+        destination: state.destinationId,
+        dateFrom: state.dateFrom,
+        dateTo: state.dateTo,
+        basePrice: state.basePrice,
+        offers: state.selectedOffers
+      };
+      this.#eventsModel.addEvent(newEventData);
       remove(newEventComponent);
       this.#currentEditComponent = null;
     });
@@ -155,7 +261,6 @@ export default class TripPresenter {
     replace(editComponent, eventComponent);
     this.#currentEventId = eventId;
     this.#currentEditComponent = editComponent;
-
     document.addEventListener('keydown', this.#escKeyDownHandler);
   }
 
@@ -163,16 +268,37 @@ export default class TripPresenter {
     replace(eventComponent, editComponent);
     this.#currentEventId = null;
     this.#currentEditComponent = null;
-
     document.removeEventListener('keydown', this.#escKeyDownHandler);
   }
 
   #handleFilterChange(filterType) {
-    console.log('Filter changed to', filterType);
+    if (this.#currentFilter === filterType) return;
+    this.#currentFilter = filterType;
+    this.#renderEvents();
+    this.#updateFilterView();
+  }
+
+  #updateFilterView() {
+    const filtersContainer = document.querySelector('.trip-controls__filters');
+    if (!filtersContainer) return;
+
+    const filters = this.#eventsModel.getFiltersCount();
+    const newFilterView = new FilterView(filters, this.#currentFilter);
+
+    if (this.#filterView) {
+      replace(newFilterView, this.#filterView);
+    } else {
+      render(newFilterView, filtersContainer);
+    }
+
+    this.#filterView = newFilterView;
+    this.#filterView.setFilterChangeHandler(this.#handleFilterChange.bind(this));
   }
 
   #handleSortChange(sortType) {
-    console.log('Sort changed to', sortType);
+    if (this.#currentSort === sortType) return;
+    this.#currentSort = sortType;
+    this.#renderEvents();
   }
 
   #escKeyDownHandler = (evt) => {
