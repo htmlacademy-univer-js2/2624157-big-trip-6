@@ -20,6 +20,7 @@ const createSortTemplate = (currentSortType) => {
                type="radio"
                name="trip-sort"
                value="sort-${sort.type}"
+               data-sort-type="${sort.type}"
                ${isChecked}
                ${isDisabled}>
         <label class="trip-sort__btn" for="sort-${sort.type}">${sort.name}</label>
@@ -51,7 +52,12 @@ export default class SortView extends AbstractView {
     this._callback.sortChange = callback;
     this.element.querySelectorAll('.trip-sort__input').forEach((input) => {
       if (!input.disabled) {
-        input.addEventListener('change', () => callback(input.value.replace('sort-', '')));
+        input.addEventListener('change', (evt) => {
+          const sortType = evt.target.dataset.sortType;
+          if (sortType) {
+            callback(sortType);
+          }
+        });
       }
     });
   }
