@@ -22,6 +22,23 @@ const SortType = {
   PRICE: 'price'
 };
 
+// Функции сортировки
+const sortByDay = (events) => {
+  return [...events].sort((a, b) => new Date(a.dateFrom) - new Date(b.dateFrom));
+};
+
+const sortByTime = (events) => {
+  return [...events].sort((a, b) => {
+    const durationA = new Date(a.dateTo) - new Date(a.dateFrom);
+    const durationB = new Date(b.dateTo) - new Date(b.dateFrom);
+    return durationB - durationA;
+  });
+};
+
+const sortByPrice = (events) => {
+  return [...events].sort((a, b) => b.basePrice - a.basePrice);
+};
+
 export default class TripPresenter {
   #container = null;
   #eventsModel = null;
@@ -95,7 +112,8 @@ export default class TripPresenter {
     this.#clearEventsList();
 
     let events = this.#eventsModel.getFilteredEvents(this.#currentFilter);
-    events = this.#sortEvents(events);
+
+    events = this.#getSortedEvents(events);
 
     const destinations = this.#eventsModel.getDestinations();
     const offers = this.#eventsModel.getOffers();
@@ -118,26 +136,15 @@ export default class TripPresenter {
     });
   }
 
-  #sortEvents(events) {
-    const sortedEvents = [...events];
-
+  #getSortedEvents(events) {
     switch (this.#currentSort) {
       case SortType.TIME:
-        sortedEvents.sort((a, b) => {
-          const durationA = new Date(a.dateTo) - new Date(a.dateFrom);
-          const durationB = new Date(b.dateTo) - new Date(b.dateFrom);
-          return durationB - durationA;
-        });
-        break;
+        return sortByTime(events);
       case SortType.PRICE:
-        sortedEvents.sort((a, b) => b.basePrice - a.basePrice);
-        break;
+        return sortByPrice(events);
       default:
-        sortedEvents.sort((a, b) => new Date(a.dateFrom) - new Date(b.dateFrom));
-        break;
+        return sortByDay(events);
     }
-
-    return sortedEvents;
   }
 
   #clearEventsList() {
@@ -164,7 +171,6 @@ export default class TripPresenter {
   }
 
   #renderNewEvent(event, destinations, offers) {
-    // Для нового события используем временный подход
     const editComponent = new EventEditView(event, destinations, offers, true);
 
     editComponent.setFormSubmitHandler((state) => {
@@ -231,7 +237,10 @@ export default class TripPresenter {
   }
 
   #handleSortChange(sortType) {
-    if (this.#currentSort === sortType) return;
+    if (this.#currentSort === sortType) {
+      return;
+    }
+
     this.#currentSort = sortType;
     this.#renderEvents();
   }
