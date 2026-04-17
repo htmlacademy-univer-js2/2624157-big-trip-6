@@ -4,6 +4,7 @@ import EmptyEventsView from '../view/empty-events-view.js';
 import EventPresenter from './event-presenter.js';
 import { EventType } from '../const.js';
 import { render, replace, remove } from '../framework/render.js';
+import EventEditView from '../view/event-edit-view.js';
 
 const createNewEvent = (destinations) => ({
   id: `new-event-${Date.now()}`,
@@ -193,6 +194,14 @@ export default class TripPresenter {
 
     editComponent.setDeleteClickHandler(() => {
       remove(editComponent);
+    });
+
+    editComponent.setTypeChangeHandler((type) => {
+      console.log('New event type changed to', type);
+    });
+
+    editComponent.setDestinationChangeHandler((destinationId) => {
+      console.log('New event destination changed to', destinationId);
     });
 
     render(editComponent, this.#container);
