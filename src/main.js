@@ -3,6 +3,7 @@ import EventsModel from './model/events-model.js';
 import { generateDestinations } from './mock/destination.js';
 import { generateOffers } from './mock/offer.js';
 import { generateEvents } from './mock/event.js';
+import 'flatpickr/dist/flatpickr.min.css';
 
 const destinations = generateDestinations();
 const offers = generateOffers();

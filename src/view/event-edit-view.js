@@ -1,6 +1,8 @@
 import AbstractStatefulView from '../framework/view/abstract-stateful-view.js';
 import { EventType, EventTypeLabels, EventTypeIcons } from '../const.js';
-import { formatDateTime, formatDateForInput } from '../utils/common.js';
+//import { formatDateTime, formatDateForInput } from '../utils/common.js';
+import { formatDateTime, formatDateForInput } from '../utils/date.js';
+import flatpickr from 'flatpickr';
 
 const createEventEditTemplate = (state, destinations, offers, isNew = false) => {
   const { type, destinationId, dateFrom, dateTo, basePrice, selectedOffers } = state;
@@ -120,6 +122,9 @@ const createEventEditTemplate = (state, destinations, offers, isNew = false) => 
   `;
 };
 export default class EventEditView extends AbstractStatefulView {
+  dateFromPicker = null;
+  dateToPicker = null;
+
   constructor(event, destinations, offers, isNew = false) {
     super();
     this.destinations = destinations;
@@ -158,6 +163,51 @@ export default class EventEditView extends AbstractStatefulView {
     this.setPriceChangeHandler(this._callback.priceChange);
     this.setDateChangeHandler(this._callback.dateChange);
     this.setOfferChangeHandler(this._callback.offerChange);
+    this.#initDatePickers();
+  }
+
+  #initDatePickers() {
+    if (this.dateFromPicker) {
+      this.dateFromPicker.destroy();
+      this.dateFromPicker = null;
+    }
+    if (this.dateToPicker) {
+      this.dateToPicker.destroy();
+      this.dateToPicker = null;
+    }
+
+    const dateFromInput = this.element.querySelector('#event-start-time-1');
+    const dateToInput = this.element.querySelector('#event-end-time-1');
+
+    if (!dateFromInput || !dateToInput) {
+      return;
+    }
+
+    const commonConfig = {
+      enableTime: true,
+      dateFormat: 'd/m/y H:i',
+      time_24hr: true,
+      locale: { firstDayOfWeek: 1 }
+    };
+
+    this.dateFromPicker = flatpickr(dateFromInput, {
+      ...commonConfig,
+      defaultDate: this._state.dateFrom,
+      onChange: (selectedDates) => {
+        this.updateElement({ dateFrom: selectedDates[0] });
+        this._callback.dateChange?.(this._state.dateFrom, this._state.dateTo);
+      }
+    });
+
+    this.dateToPicker = flatpickr(dateToInput, {
+      ...commonConfig,
+      defaultDate: this._state.dateTo,
+      minDate: this._state.dateFrom,
+      onChange: (selectedDates) => {
+        this.updateElement({ dateTo: selectedDates[0] });
+        this._callback.dateChange?.(this._state.dateFrom, this._state.dateTo);
+      }
+    });
   }
 
   get rollupButton() {
@@ -198,9 +248,6 @@ export default class EventEditView extends AbstractStatefulView {
 
   setDateChangeHandler(callback) {
     this._callback.dateChange = callback;
-    const timeInputs = this.element.querySelectorAll('.event__input--time');
-    if (timeInputs[0]) timeInputs[0].addEventListener('change', this.#dateFromChangeHandler);
-    if (timeInputs[1]) timeInputs[1].addEventListener('change', this.#dateToChangeHandler);
   }
 
   setOfferChangeHandler(callback) {
@@ -251,32 +298,6 @@ export default class EventEditView extends AbstractStatefulView {
       basePrice: parseInt(evt.target.value, 10)
     });
     this._callback.priceChange(this._state.basePrice);
-  };
-
-  #dateFromChangeHandler = (evt) => {
-    evt.preventDefault();
-    const [datePart, timePart] = evt.target.value.split(' ');
-    const [day, month, year] = datePart.split('/');
-    const [hours, minutes] = timePart.split(':');
-    const newDate = new Date(2000 + parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes));
-
-    this.updateElement({
-      dateFrom: newDate
-    });
-    this._callback.dateChange(this._state.dateFrom, this._state.dateTo);
-  };
-
-  #dateToChangeHandler = (evt) => {
-    evt.preventDefault();
-    const [datePart, timePart] = evt.target.value.split(' ');
-    const [day, month, year] = datePart.split('/');
-    const [hours, minutes] = timePart.split(':');
-    const newDate = new Date(2000 + parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes));
-
-    this.updateElement({
-      dateTo: newDate
-    });
-    this._callback.dateChange(this._state.dateFrom, this._state.dateTo);
   };
 
   #offerChangeHandler = (evt) => {
