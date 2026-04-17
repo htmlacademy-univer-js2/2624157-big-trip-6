@@ -1,6 +1,6 @@
 import AbstractView from '../framework/view/abstract-view.js';
 import { EventTypeIcons, EventTypeLabels } from '../const.js';
-import { formatEventDate, formatTime, formatDuration } from '../utils/common.js';
+import { formatEventDate, formatTime, formatDuration } from '../utils/date.js';
 
 const createOfferTemplate = (offer) => {
   if (!offer) return '';
