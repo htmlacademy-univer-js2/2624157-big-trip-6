@@ -20,6 +20,7 @@ export default class ApiService {
    * @param {Headers} [config.headers] Заголовки запроса
    * @returns {Promise<Response>}
    */
+
   async _load({
     url,
     method = 'GET',

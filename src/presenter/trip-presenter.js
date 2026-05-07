@@ -48,6 +48,7 @@ export default class TripPresenter {
   #eventPresenters = new Map();
   #currentSort = SortType.DAY;
   #addButtonDisabled = false;
+  #isLoading = true;
 
   constructor(container, eventsModel, filterModel) {
     if (!container) {
@@ -69,7 +70,16 @@ export default class TripPresenter {
     this.#filterModel.addObserver(this.#handleFilterModelChange.bind(this));
   }
 
-  init() {
+  async init() {
+    this.#renderLoadingMessage();
+    try {
+      await this.#eventsModel.init();  // загрузка данных
+    } catch (error) {
+      // показать сообщение об ошибке загрузки (заглушка "Failed to load...")
+      this.#renderError();
+      return;
+    }
+    this.#isLoading = false;
     this.#renderEvents();
   }
 
@@ -110,9 +120,8 @@ export default class TripPresenter {
     if (this.#emptyView) {
       remove(this.#emptyView);
     }
-
     const currentFilter = this.#filterModel.filter;
-    this.#emptyView = new EmptyEventsView(currentFilter);
+    this.#emptyView = new EmptyEventsView({ filterType: currentFilter });
     render(this.#emptyView, this.#container);
   }
 
@@ -255,5 +264,15 @@ export default class TripPresenter {
       this.#currentSort = SortType.DAY;
     }
     this.#renderEvents();
+  }
+
+  #renderLoadingMessage(){
+    this.#emptyView = new EmptyEventsView({ message: 'Loading...' });
+    render(this.#emptyView, this.#container);
+  }
+
+  #renderError(){
+    this.#emptyView = new EmptyEventsView({ message: 'Failed to load latest route information' });
+    render(this.#emptyView, this.#container);
   }
 }
