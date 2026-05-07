@@ -61,7 +61,7 @@ export default class EventPresenter {
     });
 
     this.#editComponent.setDeleteClickHandler(() => {
-      this.#handleDataChange(null, true); // true означает удаление
+      this.#handleDataChange(this.#event, true); // true означает удаление
     });
 
     this.#editComponent.setTypeChangeHandler((type) => {

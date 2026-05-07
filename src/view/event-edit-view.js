@@ -238,7 +238,9 @@ export default class EventEditView extends AbstractStatefulView {
 
   setDestinationChangeHandler(callback) {
     this._callback.destinationChange = callback;
-    this.element.querySelector('.event__input--destination').addEventListener('change', this.#destinationChangeHandler);
+    const destinationInput = this.element.querySelector('.event__input--destination');
+    destinationInput.addEventListener('change', this.#destinationChangeHandler);
+    destinationInput.addEventListener('input', this.#destinationInputHandler);
   }
 
   setPriceChangeHandler(callback) {
@@ -294,8 +296,10 @@ export default class EventEditView extends AbstractStatefulView {
 
   #priceChangeHandler = (evt) => {
     evt.preventDefault();
+    evt.target.value = evt.target.value.replace(/\D/g, '');
+    const newValue = parseInt(evt.target.value, 10) || 0;
     this.updateElement({
-      basePrice: parseInt(evt.target.value, 10)
+      basePrice: newValue
     });
     this._callback.priceChange(this._state.basePrice);
   };
@@ -315,5 +319,19 @@ export default class EventEditView extends AbstractStatefulView {
       selectedOffers
     });
     this._callback.offerChange(this._state.selectedOffers);
+  };
+
+  #destinationInputHandler = (evt) => {
+    const value = evt.target.value;
+    const isValid = this.destinations.some((dest) => dest.name === value);
+    if (!isValid && value !== '') {
+      const currentDestination = this.destinations.find((dest) => dest.id === this._state.destinationId);
+      evt.target.value = currentDestination ? currentDestination.name : '';
+    } else if (isValid) {
+
+      const destination = this.destinations.find((dest) => dest.name === value);
+      this.updateElement({ destinationId: destination.id });
+      this._callback.destinationChange?.(this._state.destinationId);
+    }
   };
 }

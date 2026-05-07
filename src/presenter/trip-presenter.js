@@ -1,4 +1,3 @@
-import FilterView from '../view/filter-view.js';
 import SortView from '../view/sort-view.js';
 import EmptyEventsView from '../view/empty-events-view.js';
 import EventPresenter from './event-presenter.js';
@@ -43,14 +42,14 @@ const sortByPrice = (events) => {
 export default class TripPresenter {
   #container = null;
   #eventsModel = null;
-  #filterView = null;
+  #filterModel = null;
   #sortView = null;
   #emptyView = null;
   #eventPresenters = new Map();
-  #currentFilter = 'everything';
   #currentSort = SortType.DAY;
+  #addButtonDisabled = false;
 
-  constructor(container, eventsModel) {
+  constructor(container, eventsModel, filterModel) {
     if (!container) {
       throw new Error('Container is required for TripPresenter');
     }
@@ -58,18 +57,35 @@ export default class TripPresenter {
     if (!eventsModel) {
       throw new Error('EventsModel is required for TripPresenter');
     }
+
+    if (!filterModel) {
+      throw new Error('FilterModel is required for TripPresenter');
+    }
     this.#container = container;
     this.#eventsModel = eventsModel;
+    this.#filterModel = filterModel;
 
     this.#eventsModel.addObserver(this.#handleModelUpdate.bind(this));
+    this.#filterModel.addObserver(this.#handleFilterModelChange.bind(this));
   }
 
   init() {
-    this.#renderFilter();
     this.#renderEvents();
   }
 
   createNewEvent() {
+    if (this.#addButtonDisabled) return;
+
+    this.#addButtonDisabled = true;
+    const addButton = document.querySelector('.trip-main__event-add-btn');
+    if (addButton) addButton.disabled = true;
+
+    // сбросить фильтр и сортировку
+    this.#filterModel.setFilter('user', 'everything');
+    this.#currentSort = SortType.DAY;
+
+    // закрыть все открытые формы редактирования
+    this.#handleModeChange();
     const destinations = this.#eventsModel.getDestinations();
     const offers = this.#eventsModel.getOffers();
     const newEvent = createNewEvent(destinations);
@@ -78,16 +94,6 @@ export default class TripPresenter {
 
   #handleModelUpdate(updateType, data) {
     this.#renderEvents();
-  }
-
-  #renderFilter() {
-    const filtersContainer = document.querySelector('.trip-controls__filters');
-    if (!filtersContainer) return;
-
-    const filters = this.#eventsModel.getFiltersCount();
-    this.#filterView = new FilterView(filters, this.#currentFilter);
-    render(this.#filterView, filtersContainer);
-    this.#filterView.setFilterChangeHandler(this.#handleFilterChange.bind(this));
   }
 
   #renderSort() {
@@ -105,14 +111,16 @@ export default class TripPresenter {
       remove(this.#emptyView);
     }
 
-    this.#emptyView = new EmptyEventsView();
+    const currentFilter = this.#filterModel.filter;
+    this.#emptyView = new EmptyEventsView(currentFilter);
     render(this.#emptyView, this.#container);
   }
 
   #renderEvents() {
     this.#clearEventsList();
 
-    let events = this.#eventsModel.getFilteredEvents(this.#currentFilter);
+    const currentFilter = this.#filterModel.filter;
+    let events = this.#eventsModel.getFilteredEvents(currentFilter);
 
     events = this.#getSortedEvents(events);
 
@@ -173,6 +181,23 @@ export default class TripPresenter {
 
   #renderNewEvent(event, destinations, offers) {
     const editComponent = new EventEditView(event, destinations, offers, true);
+    console.log('editComponent created', editComponent);
+
+    const removeForm = () => {
+      remove(editComponent);
+      this.#addButtonDisabled = false;
+      const addButton = document.querySelector('.trip-main__event-add-btn');
+      if (addButton) addButton.disabled = false;
+      document.removeEventListener('keydown', onEscKeyDown);
+    };
+
+    const onEscKeyDown = (evt) => {
+      if (evt.key === 'Escape') {
+        evt.preventDefault();
+        removeForm();
+      }
+    };
+    document.addEventListener('keydown', onEscKeyDown);
 
     editComponent.setFormSubmitHandler((state) => {
       const newEventData = {
@@ -185,24 +210,19 @@ export default class TripPresenter {
         offers: state.selectedOffers
       };
       this.#eventsModel.addEvent(newEventData);
-      remove(editComponent);
+      removeForm();
     });
 
     editComponent.setRollupClickHandler(() => {
-      remove(editComponent);
+      removeForm();
     });
 
     editComponent.setDeleteClickHandler(() => {
-      remove(editComponent);
+      removeForm();
     });
 
-    editComponent.setTypeChangeHandler((type) => {
-      console.log('New event type changed to', type);
-    });
-
-    editComponent.setDestinationChangeHandler((destinationId) => {
-      console.log('New event destination changed to', destinationId);
-    });
+    editComponent.setTypeChangeHandler(() => {});
+    editComponent.setDestinationChangeHandler(() => {});
 
     render(editComponent, this.#container);
   }
@@ -221,36 +241,19 @@ export default class TripPresenter {
     });
   }
 
-  #handleFilterChange(filterType) {
-    if (this.#currentFilter === filterType) return;
-    this.#currentFilter = filterType;
-    this.#renderEvents();
-    this.#updateFilterView();
-  }
-
-  #updateFilterView() {
-    const filtersContainer = document.querySelector('.trip-controls__filters');
-    if (!filtersContainer) return;
-
-    const filters = this.#eventsModel.getFiltersCount();
-    const newFilterView = new FilterView(filters, this.#currentFilter);
-
-    if (this.#filterView) {
-      replace(newFilterView, this.#filterView);
-    } else {
-      render(newFilterView, filtersContainer);
-    }
-
-    this.#filterView = newFilterView;
-    this.#filterView.setFilterChangeHandler(this.#handleFilterChange.bind(this));
-  }
-
   #handleSortChange(sortType) {
     if (this.#currentSort === sortType) {
       return;
     }
 
     this.#currentSort = sortType;
+    this.#renderEvents();
+  }
+
+  #handleFilterModelChange(updateType, filterType) {
+    if (this.#currentSort !== SortType.DAY) {
+      this.#currentSort = SortType.DAY;
+    }
     this.#renderEvents();
   }
 }
