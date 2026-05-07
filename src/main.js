@@ -1,5 +1,7 @@
 import TripPresenter from './presenter/trip-presenter.js';
 import EventsModel from './model/events-model.js';
+import FilterModel from './model/filter-model.js';
+import FilterPresenter from './presenter/filter-presenter.js';
 import { generateDestinations } from './mock/destination.js';
 import { generateOffers } from './mock/offer.js';
 import { generateEvents } from './mock/event.js';
@@ -14,10 +16,20 @@ eventsModel.setDestinations(destinations);
 eventsModel.setOffers(offers);
 eventsModel.setEvents(events);
 
+const filterModel = new FilterModel();
+
 const siteMainElement = document.querySelector('.page-main');
 const tripEventsContainer = siteMainElement.querySelector('.trip-events');
 
-const tripPresenter = new TripPresenter(tripEventsContainer, eventsModel);
+const tripPresenter = new TripPresenter(tripEventsContainer, eventsModel, filterModel);
+const filterPresenter = new FilterPresenter({
+  container: document.querySelector('.trip-controls__filters'),
+  filterModel,
+  eventsModel,
+  onFilterChange: () => {}// можно пусто, так как tripPresenter сам подписан на изменения filterModel
+});
+
+filterPresenter.init();
 tripPresenter.init();
 
 const addButton = document.querySelector('.trip-main__event-add-btn');
