@@ -2,20 +2,14 @@ import TripPresenter from './presenter/trip-presenter.js';
 import EventsModel from './model/events-model.js';
 import FilterModel from './model/filter-model.js';
 import FilterPresenter from './presenter/filter-presenter.js';
-import { generateDestinations } from './mock/destination.js';
-import { generateOffers } from './mock/offer.js';
-import { generateEvents } from './mock/event.js';
 import 'flatpickr/dist/flatpickr.min.css';
+import TripApiService from './trip-api-service.js';
 
-const destinations = generateDestinations();
-const offers = generateOffers();
-const events = generateEvents(8, destinations, offers);
+const AUTHORIZATION = `Basic ${Math.random().toString(36).substr(2)}`;
+const END_POINT = 'https://24.objects.htmlacademy.pro/big-trip';
+const apiService = new TripApiService(END_POINT, AUTHORIZATION);
 
-const eventsModel = new EventsModel();
-eventsModel.setDestinations(destinations);
-eventsModel.setOffers(offers);
-eventsModel.setEvents(events);
-
+const eventsModel = new EventsModel(apiService);
 const filterModel = new FilterModel();
 
 const siteMainElement = document.querySelector('.page-main');
@@ -26,7 +20,7 @@ const filterPresenter = new FilterPresenter({
   container: document.querySelector('.trip-controls__filters'),
   filterModel,
   eventsModel,
-  onFilterChange: () => {}// можно пусто, так как tripPresenter сам подписан на изменения filterModel
+  onFilterChange: () => {}
 });
 
 filterPresenter.init();

@@ -1,9 +1,11 @@
+import { adaptPointFromServer, adaptPointToServer } from '../utils/adapter.js';
 export default class EventsModel {
-  constructor() {
+  constructor(apiService) {
     this.events = [];
     this.destinations = [];
     this.offers = [];
     this._observers = [];
+    this.#apiService = apiService;
   }
 
   addObserver(observer) {
@@ -91,24 +93,41 @@ export default class EventsModel {
     return this.offers.find((offer) => offer.id === id);
   }
 
-  updateEvent(updatedEvent) {
-    const index = this.events.findIndex((event) => event.id === updatedEvent.id);
+  async init() {
+    const [points, destinations, offers] = await Promise.all([
+      this.#apiService.getPoints(),
+      this.#apiService.getDestinations(),
+      this.#apiService.getOffers()
+    ]);
+    this.events = points.map(adaptPointFromServer);
+    this.destinations = destinations;
+    this.offers = offers;
+  }
+
+  async updateEvent(updatedEvent) {
+    const updatedServerPoint = await this.#apiService.updatePoint(
+      updatedEvent.id,
+      adaptPointToServer(updatedEvent)
+    );
+    const index = this.events.findIndex((e) => e.id === updatedEvent.id);
     if (index !== -1) {
-      this.events[index] = { ...this.events[index], ...updatedEvent };
-      this._notify('update', { action: 'updateEvent', event: updatedEvent });
+      this.events[index] = adaptPointFromServer(updatedServerPoint);
+      this._notify('update', { action: 'updateEvent' });
     }
   }
 
-  addEvent(newEvent) {
+  async addEvent(newEvent) {
     this.events.push(newEvent);
     this._notify('update', { action: 'addEvent', event: newEvent });
   }
 
-  deleteEvent(eventId) {
+  async deleteEvent(eventId) {
     const index = this.events.findIndex((event) => event.id === eventId);
     if (index !== -1) {
       this.events.splice(index, 1);
       this._notify('update', { action: 'deleteEvent', eventId });
     }
   }
+
+  #apiService = null;
 }
