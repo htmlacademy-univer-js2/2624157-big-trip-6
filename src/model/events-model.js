@@ -1,4 +1,6 @@
+// src/model/events-model.js
 import { adaptPointFromServer, adaptPointToServer } from '../utils/adapter.js';
+
 export default class EventsModel {
   constructor(apiService) {
     this.events = [];
@@ -117,15 +119,27 @@ export default class EventsModel {
   }
 
   async addEvent(newEvent) {
-    this.events.push(newEvent);
-    this._notify('update', { action: 'addEvent', event: newEvent });
+    try {
+      const serverEvent = await this.#apiService.addPoint(adaptPointToServer(newEvent));
+      const adaptedEvent = adaptPointFromServer(serverEvent);
+      this.events.push(adaptedEvent);
+      this._notify('update', { action: 'addEvent', event: adaptedEvent });
+      return adaptedEvent;
+    } catch (err) {
+      throw err;
+    }
   }
 
   async deleteEvent(eventId) {
-    const index = this.events.findIndex((event) => event.id === eventId);
-    if (index !== -1) {
-      this.events.splice(index, 1);
-      this._notify('update', { action: 'deleteEvent', eventId });
+    try {
+      await this.#apiService.deletePoint(eventId);
+      const index = this.events.findIndex((event) => event.id === eventId);
+      if (index !== -1) {
+        this.events.splice(index, 1);
+        this._notify('update', { action: 'deleteEvent', eventId });
+      }
+    } catch (err) {
+      throw err;
     }
   }
 
