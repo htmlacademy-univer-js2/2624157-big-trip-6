@@ -1,9 +1,11 @@
+// src/presenter/trip-presenter.js
 import SortView from '../view/sort-view.js';
 import EmptyEventsView from '../view/empty-events-view.js';
 import EventPresenter from './event-presenter.js';
 import { EventType } from '../const.js';
 import { render, replace, remove } from '../framework/render.js';
 import EventEditView from '../view/event-edit-view.js';
+import UiBlocker from '../framework/ui-blocker/ui-blocker.js';
 
 const createNewEvent = (destinations) => ({
   id: `new-event-${Date.now()}`,
@@ -49,6 +51,7 @@ export default class TripPresenter {
   #currentSort = SortType.DAY;
   #addButtonDisabled = false;
   #isLoading = true;
+  #uiBlocker = new UiBlocker({ lowerLimit: 500, upperLimit: 1000 });
 
   constructor(container, eventsModel, filterModel) {
     if (!container) {
@@ -181,7 +184,8 @@ export default class TripPresenter {
     const eventPresenter = new EventPresenter({
       container: this.#container,
       onDataChange: this.#handleEventChange.bind(this),
-      onModeChange: this.#handleModeChange.bind(this)
+      onModeChange: this.#handleModeChange.bind(this),
+      uiBlocker: this.#uiBlocker
     });
 
     eventPresenter.init(event, destinations, offers);
@@ -190,7 +194,6 @@ export default class TripPresenter {
 
   #renderNewEvent(event, destinations, offers) {
     const editComponent = new EventEditView(event, destinations, offers, true);
-    console.log('editComponent created', editComponent);
 
     const removeForm = () => {
       remove(editComponent);
@@ -208,7 +211,14 @@ export default class TripPresenter {
     };
     document.addEventListener('keydown', onEscKeyDown);
 
-    editComponent.setFormSubmitHandler((state) => {
+    const setSaveButtonState = (isSaving) => {
+      const saveBtn = editComponent.element.querySelector('.event__save-btn');
+      if (saveBtn) {
+        saveBtn.textContent = isSaving ? 'Saving...' : 'Save';
+      }
+    };
+
+    editComponent.setFormSubmitHandler(async (state) => {
       const newEventData = {
         ...event,
         type: state.type,
@@ -218,8 +228,18 @@ export default class TripPresenter {
         basePrice: state.basePrice,
         offers: state.selectedOffers
       };
-      this.#eventsModel.addEvent(newEventData);
-      removeForm();
+
+      this.#uiBlocker.block();
+      setSaveButtonState(true);
+      try {
+        await this.#eventsModel.addEvent(newEventData);
+        removeForm();
+      } catch (err) {
+        editComponent.shake();
+      } finally {
+        this.#uiBlocker.unblock();
+        setSaveButtonState(false);
+      }
     });
 
     editComponent.setRollupClickHandler(() => {
@@ -236,11 +256,15 @@ export default class TripPresenter {
     render(editComponent, this.#container);
   }
 
-  #handleEventChange(updatedEvent, isDelete = false) {
-    if (isDelete) {
-      this.#eventsModel.deleteEvent(updatedEvent.id);
-    } else {
-      this.#eventsModel.updateEvent(updatedEvent);
+  #handleEventChange = async (updatedEvent, isDelete = false) => {
+    try {
+      if (isDelete) {
+        await this.#eventsModel.deleteEvent(updatedEvent.id);
+      } else {
+        await this.#eventsModel.updateEvent(updatedEvent);
+      }
+    } catch (err) {
+      throw err;
     }
   }
 

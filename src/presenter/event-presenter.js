@@ -1,3 +1,4 @@
+// src/presenter/event-presenter.js
 import EventView from '../view/event-view.js';
 import EventEditView from '../view/event-edit-view.js';
 import { render, replace, remove } from '../framework/render.js';
@@ -11,12 +12,14 @@ export default class EventPresenter {
   #editComponent = null;
   #handleDataChange = null;
   #handleModeChange = null;
+  #uiBlocker = null;
   #isEditMode = false;
 
-  constructor({ container, onDataChange, onModeChange }) {
+  constructor({ container, onDataChange, onModeChange, uiBlocker }) {
     this.#container = container;
     this.#handleDataChange = onDataChange;
     this.#handleModeChange = onModeChange;
+    this.#uiBlocker = uiBlocker;
   }
 
   init(event, destinations, offers) {
@@ -42,7 +45,7 @@ export default class EventPresenter {
       this.#handleDataChange(updatedEvent);
     });
 
-    this.#editComponent.setFormSubmitHandler((state) => {
+    this.#editComponent.setFormSubmitHandler(async (state) => {
       const updatedEvent = {
         ...this.#event,
         type: state.type,
@@ -52,16 +55,39 @@ export default class EventPresenter {
         basePrice: state.basePrice,
         offers: state.selectedOffers
       };
-      this.#handleDataChange(updatedEvent);
-      this.#replaceEditToEvent();
+
+      this.#uiBlocker.block();
+      this.#setSaveButtonState(true);
+      try {
+        await this.#handleDataChange(updatedEvent, false);
+        this.#replaceEditToEvent();
+      } catch (err) {
+        this.#editComponent.shake();
+      } finally {
+        this.#uiBlocker.unblock();
+        this.#setSaveButtonState(false);
+      }
     });
 
     this.#editComponent.setRollupClickHandler(() => {
       this.#replaceEditToEvent();
     });
 
-    this.#editComponent.setDeleteClickHandler(() => {
-      this.#handleDataChange(this.#event, true); // true означает удаление
+    this.#editComponent.setDeleteClickHandler(async () => {
+      this.#uiBlocker.block();
+      this.#setDeleteButtonState(true);
+      try {
+        await this.#handleDataChange(this.#event, true);
+        // После успешного удаления компонент будет уничтожен при перерисовке списка
+      } catch (err) {
+        this.#editComponent.shake();
+      } finally {
+        this.#uiBlocker.unblock();
+        // Восстанавливаем текст кнопки только если компонент ещё в DOM
+        if (this.#editComponent && this.#editComponent.element && this.#editComponent.element.isConnected) {
+          this.#setDeleteButtonState(false);
+        }
+      }
     });
 
     this.#editComponent.setTypeChangeHandler((type) => {
@@ -113,6 +139,20 @@ export default class EventPresenter {
   resetView() {
     if (this.#isEditMode) {
       this.#replaceEditToEvent();
+    }
+  }
+
+  #setSaveButtonState(isSaving) {
+    const saveBtn = this.#editComponent.element.querySelector('.event__save-btn');
+    if (saveBtn) {
+      saveBtn.textContent = isSaving ? 'Saving...' : 'Save';
+    }
+  }
+
+  #setDeleteButtonState(isDeleting) {
+    const deleteBtn = this.#editComponent.element.querySelector('.event__reset-btn');
+    if (deleteBtn) {
+      deleteBtn.textContent = isDeleting ? 'Deleting...' : 'Delete';
     }
   }
 
